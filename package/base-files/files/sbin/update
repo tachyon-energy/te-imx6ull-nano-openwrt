@@ -1,0 +1,722 @@
+#!/bin/sh
+
+
+
+export BACKUP_LIST=0
+export BACKUP_ETC=1
+export MODE="AUTO"
+export VERBOSE=1
+export IPADDRESS="192.168.1.117:50812/update/"
+export FILE_IMAGE="firmware.bin"
+export HELP=0
+export ETCBACKUP_DIR=/etc/backup
+export INSTALLED_PACKAGES=${ETCBACKUP_DIR}/installed_packages.txt
+export FORCE=0
+export TEST=0
+export KEY_PATH="/etc/key.txt"
+export MMC="mmcblk1"
+export RECOVERY_PART="p2"
+export USBD="sda1"
+export LOG_FILE="/var/log/update"
+
+RED="\033[1;31m"
+GREEN="\033[1;32m"
+Yellow="\033[0;33m"
+Blue="\033[0;34m"
+Purple="\033[0;35m"
+Cyan="\033[0;36m"
+White="\033[0;37m"
+NOCOLOR="\033[0m"
+
+cdate=`date`
+echo $cdate > $LOG_FILE
+echo "update "$@ >> $LOG_FILE
+
+
+
+while [ -n "$1" ]; do
+	case "$1" in
+        --auto) export MODE="AUTO";;
+        -b) export BACKUP_LIST=1;;
+        -e) export BACKUP_ETC=0;;
+        -f) export FILE_IMAGE="$2"; shift;;
+        --force) export FORCE=1;;
+        -h|--help) export HELP=1; break;;
+        -k) export KEY_PATH="$2"; shift;;
+        -m) export MODE="$2"; shift;;
+        -n) export MODE="network" IPADDRESS="$2"; shift;;
+        --test) export TEST=1; break;;
+        -v) export VERBOSE=0;;
+		-*)
+			echo "Invalid option: $1" >&2
+			exit 1
+		;;
+		*) break;;
+	esac
+	shift;
+done
+
+mkdir -p /update
+
+ostype=`fw_printenv | grep -i ostype= | cut -d'=' -f2`
+prefix=`fw_printenv | grep -i prefix= | cut -d'=' -f2`
+module=`fw_printenv | grep -i module= | cut -d'=' -f2`
+model=`fw_printenv | grep -i model= | cut -d'=' -f2`
+kernel_part=`fw_printenv | grep -i mmcpart= | cut -d'=' -f2`
+rootfs_part=`fw_printenv | grep -i fspart= | cut -d'=' -f2`
+en1=`fw_printenv | grep -i  rootfs_upd= | cut -d'=' -f2`
+en2=`fw_printenv | grep -i  kernel_upd= | cut -d'=' -f2`
+en3=`fw_printenv | grep -i  fdt_upd= | cut -d'=' -f2`
+
+kernel_name=$ostype-$prefix-$module-$model-zImage
+bkp_kernel_name=$ostype-$prefix-$module-$model-zImage-old
+fdt_name=$ostype-$module-$model.dtb
+bkp_fdt_name=$ostype-$module-$model-old.dtb
+rfs_name=$ostype-$prefix-$module-$model-rootfs.tar.gz
+uboot_name=u-boot.img
+
+if [ $module = "imx6ull-nano-cpu" ]; then MMC="mmcblk1" USBD="sdb1" uboot_name="u-boot.imx"
+fi
+
+function show_info {
+    message_success "PLC model: $model"
+    message_success "OS type: $ostype"
+    message_success "Kernel partition: $MMC$cur_kernel_part"
+    message_success "File System partition: $MMC$cur_rootfs_part"
+    message_success "FDT file name: $fdt_name"
+    message_success "Kernel file name: $kernel_name"
+    message_successy "Update bits:"
+
+    if [ $en3 = "yes" ];
+    then message_alarm "fdt_upd is SET"
+    else message_success "fdt_upd is CLEAR"
+    fi
+
+    if [ $en2 = "yes" ];
+    then message_alarm "kernel_upd is SET"
+    else message_success "kernel_upd is CLEAR"
+    fi
+
+    if [ $en1 = "yes" ];
+    then message_alarm "rootfs_upd is SET"
+    else message_success "rootfs_upd is CLEAR"
+    fi  
+}
+
+function reset_env {
+    fw_setenv rootfs_upd no
+    fw_setenv fdt_upd no
+    fw_setenv kernel_upd no
+    fw_setenv update no
+    message_success "Clear update env "
+}
+
+# Print functions 
+function message_success {
+    echo $1 >> $LOG_FILE
+    if [ $VERBOSE -eq 1 ]; then
+    if [ $TEST -eq 0 ]; then
+        echo -e "INFO: ${GREEN}$1 ${NOCOLOR}"
+    else
+        echo "INFO: $1"  
+    fi      
+    fi
+}
+
+function message_successy {
+    echo $1 >> $LOG_FILE
+    if [ $VERBOSE -eq 1 ]; then
+    if [ $TEST -eq 0 ]; then
+        echo -e "${Cyan}INFO: $1 ${NOCOLOR}"
+    else
+        echo "INFO: $1"  
+    fi      
+    fi
+}
+
+function message_alarm {
+    echo $1 >> $LOG_FILE
+    if [ $VERBOSE -eq 1 ]; then
+    if [ $TEST -eq 0 ]; then
+        echo -e "${RED}ERROR: $1 ${NOCOLOR}"
+    else
+        echo "ERROR: $1"
+    fi        
+    fi
+}
+
+
+function get_partitions {
+case "$kernel_part" in
+    7)
+	new_kernel_part=p8
+    cur_kernel_part=p7
+    kpart=8
+	;;
+    8)
+	new_kernel_part=p7
+    cur_kernel_part=p8
+    kpart=7
+    ;;
+    *)
+    message_alarm "Unknow kernel partition $MMC$current_kernel_part "
+	exit 1
+esac
+
+case "$rootfs_part" in
+    no)
+	cur_rootfs_part=p6
+    new_rootfs_part=p5
+	nfspart=yes
+    ;;
+    yes)
+	cur_rootfs_part=p5
+    new_rootfs_part=p6
+	nfspart=no
+    ;;
+    *)
+    message_alarm "Unknow ROOTFS partition $MMC$cur_rootfs_part "
+    exit 1
+esac
+
+}
+
+
+
+function update_dtb_kernel() {
+    if mount | grep /dev/$MMC$1 > /dev/null; then
+        ls /dev/$MMC$1 | xargs -n1 umount -l >> /dev/null 2>&1  ;
+        message_successy "Unmount $MMC$1 partition"
+    fi
+        mkdir -p /mnt/kernel >> /dev/null 2>&1; message_successy "Create /mnt/kernel dir"
+    if mount -t ext4 /dev/$MMC$1 /mnt/kernel/  >> /dev/null 2>&1; then  message_success "Mount successfully /dev/$MMC$1 partition"
+
+	else message_alarm "Can't mount /dev/$MMC$1" ; exit 1; 
+    fi
+
+    if [[ $# -eq 2 ]]; then
+        mv /mnt/kernel/$2 /mnt/kernel/$2-old
+        cp /update/$2 /mnt/kernel/; message_success "Copy new DTB file"
+        fw_setenv fdt_upd yes; message_success "Update u-boot fdt_upd env"
+        rm -fr /update/$2
+    else
+        mv /mnt/kernel/$2 /mnt/kernel/$2-old
+        cp /update/$2 /mnt/kernel/; message_success "Copy new DTB file"
+        mv /mnt/kernel/$3 /mnt/kernel/$3-old
+        cp /update/$3 /mnt/kernel/; message_success "Copy new KERNEL file"
+        fw_setenv fdt_upd yes; message_success "Update u-boot fdt_upd env"
+        rm -fr /update/$2
+        fw_setenv kernel_upd yes; message_success "Update u-boot kernel_upd env"
+        rm -fr /update/$3
+    fi
+        sync;
+        sync;
+        umount /mnt/kernel >> /dev/null 2>&1; message_success "Umount partition"
+
+	    logger "dtb/kernel file(s) update "
+	    message_success "dtb/kernel file(s) update succefully!"
+}
+
+
+function update_rootfs {
+		crp1=`lsblk -i -l -n |  grep -E "(mmcblk?p?).+part \/" | cut -f1 -d' '`
+		crp2=$$MMC$new_rootfs_part
+	 if [ "$crp1" == "$crp2" ];
+        then
+			crp1=$new_rootfs_part
+			case "$crp1" in
+				p5)
+					cur_rootfs_part=p5
+    				new_rootfs_part=p6
+					nfspart=no
+					;;
+				p6) 
+					cur_rootfs_part=p6
+    				new_rootfs_part=p5
+					nfspart=yes
+					;;
+				*)	
+					message_alarm "Unknow current rootfs partition"
+					exit 1
+			esac
+		fi
+
+
+    if [ $BACKUP_ETC -eq 1 ]; then
+        message_successy "Backup /etc/ files"
+        tar cf /update/backup.tar.bz2 /etc/*
+    fi;
+    if mount | grep /dev/$MMC$new_rootfs_part > /dev/null; then
+        ls /dev/$MMC$new_rootfs_part | xargs -n1 umount -l >> /dev/null 2>&1  ;
+        message_successy "Unmount $MMC$new_rootfs_part partition"
+    fi
+        mkfs.ext4 -j -F /dev/$MMC$new_rootfs_part >> /dev/null 2>&1
+        mkdir -p /mnt/rootfs
+        mount -t ext4 /dev/$MMC$new_rootfs_part /mnt/rootfs
+        message_successy "Start untar rootfs archive to eMMC"
+        pv /update/$rfs_name | tar -xzf - -C /mnt/rootfs/
+        sync;
+        message_success "Untar complete..."
+    
+#Check is both rootfs is some type (openwrt=openwrt)    
+    if [ $BACKUP_ETC -eq 1 ]; then
+        rls1=`cat /etc/os-release | grep -i ^ID= | cut -d'=' -f2`
+        rls2=`cat /mnt/rootfs/etc/os-release | grep -i ^ID= | cut -d'=' -f2`
+
+    if [ $rls1 = $rls2 ];
+        then tar xf /update/backup.tar.bz2 -C /mnt/rootfs/; message_successy "Restore /etc/ files "
+        else message_alarm "OS type do not match"
+    fi 
+    fi;
+
+    if [ $BACKUP_LIST -eq 1 ]; then
+        mkdir -p /mnt/rootfs/etc/backup 
+        opkg list-installed > /mnt/rootfs${INSTALLED_PACKAGES}
+    fi;
+        sync;
+        sync;
+        umount -l /mnt/rootfs >> /dev/null 2>&1
+        rm -fr /update/$rfs_name
+        rm -fr /update/backup.tar.bz2
+	    fw_setenv rootfs_upd yes
+	    logger "rootfs partition $MMC$new_rootfs_part update"
+	    message_success "rootfs update succefully!"
+}
+
+function update_uboot() {
+    if [ $module = "imx6ull-nano-cpu" ]; then 
+        message_successy "Clear u-boot environments"
+        message_success "Burn new u-boot.imx"
+# clear u-boot env
+        dd if=/dev/zero of=/dev/$MMC bs=1k seek=384 conv=fsync count=129
+# burn u-boot
+        dd if=u-boot.imx of=/dev/$MMC bs=1k seek=1 conv=fsync;
+    else
+        message_successy "Format u-boot partition"
+        mkfs.fat /dev/$MMCp1
+        mkdir -p /mnt/boot
+        mount /dev/$MMCp1 /mnt/boot
+        cp -fr u-boot.img /mnt/boot/
+        cp -fr MLO /mnt/boot/
+        sync;
+        sync;
+        umount /mnt/boot
+    fi;
+        fw_setenv mfg yes
+}
+
+function decrypt_image {
+        message_successy "Decrypt firmware image"
+        openssl enc -aes-256-cbc -d -pass file:$KEY_PATH < /update/$FILE_IMAGE > /update/files.tar 
+    if [ $? -eq 0 ]; then
+        message_success "Decrypt $FILE_IMAGE successfully"
+    else
+        message_alarm "Decrypt $FILE_IMAGE failed"
+        return 1
+    fi
+        rm -fr /update/$FILE_IMAGE
+        message_successy "Untar firmware image"
+        tar -C /update -xvf /update/files.tar
+    if [ $? = 0 ]
+	    then
+    	message_success "Untar firmware image successfully"
+	    else
+    	message_alarm "Untar image failed!"
+        rm -fr /update/files.tar
+        exit 1
+    fi
+        rm -fr /update/files.tar
+        message_success "Delete firmware image"
+}
+
+umode=""
+
+function check_files {
+        cd /update
+    if	test -f "/update/upd-$fdt_name";
+        then
+        message_success "Found $fdt_name file"
+	    dd if=upd-$fdt_name of=dtb.md5 bs=32 count=1  >> /dev/null 2>&1
+	    dd if=upd-$fdt_name of=$fdt_name skip=32 iflag=skip_bytes conv=notrunc  >> /dev/null 2>&1
+    if [ $TEST -eq 0 ]; then
+        rm -fr upd-$fdt_name
+    fi
+        m1=`cat dtb.md5`
+	    m2=`md5sum $fdt_name | cut -d' ' -f1`	
+        rm -fr dtb.md5	
+	if [ "$m1" == "$m2" ] ;
+        then
+	    message_success "$fdt_name md5sum check OK"
+        umode="f"
+	    else
+	    message_alarm "$fdt_name md5sum check failed, Exit..."
+	    return 1
+	fi
+	fi
+
+    if  test -f "/update/upd-$kernel_name";
+        then
+        message_success "Found $kernel_name file"
+        dd if=upd-$kernel_name of=zimage.md5 bs=32 count=1  >> /dev/null 2>&1
+		tail -c +33 upd-$kernel_name > $kernel_name 
+    if [ $TEST -eq 0 ]; then
+        rm -fr upd-$kernel_name
+    fi
+        m1=`cat zimage.md5`
+        m2=`md5sum $kernel_name | cut -d' ' -f1`
+        rm -fr zimage.md5
+    if [ "$m1" == "$m2" ];
+        then
+        message_success "$kernel_name md5sum check OK"
+        umode=$umode"k"
+        else
+        message_alarm "$kernel_name md5sum check failed, Exit..."
+        return 1
+    fi
+    fi
+
+    if  test -f "/update/upd-$rfs_name";
+        then
+        message_success "Found $rfs_name file"
+        dd if=upd-$rfs_name of=rootfs.md5 bs=32 count=1  >> /dev/null 2>&1
+	    tail -c +33 upd-$rfs_name > $rfs_name
+    if [ $TEST -eq 0 ]; then
+        rm -fr upd-$rfs_name
+    fi
+        m1=`cat rootfs.md5`
+        m2=`md5sum $rfs_name | cut -d' ' -f1`
+        rm -fr rootfs.md5
+
+    if [ "$m1" == "$m2" ];
+        then
+        message_success "$rfs_name md5sum check OK"
+        umode=$umode"r"
+        else
+        message_alarm "$rfs_name md5sum check failed, Exit..."
+        return 1
+    fi
+    fi
+
+    if  test -f "/update/upd-$uboot_name";
+        then
+            if [ $module = "am3358-nano-cpu" ]; then
+                if  test -f "/update/MLO"; then
+                message_success "Found MLO file"
+                else
+                message_alarm "MLO file not found, Exit..."
+                return 1
+                fi
+            fi
+        message_success "Found $uboot_name file"
+        dd if=upd-$uboot_name of=uboot.md5 bs=32 count=1  >> /dev/null 2>&1
+		tail -c +33 upd-$uboot_name > $uboot_name
+    if [ $TEST -eq 0 ]; then
+        rm -fr upd-$uboot_name 
+    fi 
+        m1=`cat uboot.md5`
+        m2=`md5sum $uboot_name | cut -d' ' -f1`
+        rm -fr uboot.md5
+
+    if [ "$m1" == "$m2" ];
+        then
+        message_success "$uboot_name md5sum check OK"
+        umode=$umode"u"
+        else
+        message_alarm "$uboot_name md5sum check failed, Exit..."
+        return 1
+    fi     
+    fi 
+
+	if [ $en1 = "yes" ] || [ $en2 = "yes" ] || [ $en3 = "yes" ]; then
+        echo "Warning!"
+        echo "It seems you have recently updated the firmware and did not confirm the changes."
+        echo "Click Continue to confirm the changes and update the firmware."
+        return 2
+    fi;
+
+	return 0
+}
+
+function create_recovery_rfs {
+        cd /
+        tar  --exclude='dev/*' --exclude='var/*' --exclude='tmp/*' --exclude='update/*' --exclude='proc/*' --exclude='sys/*' -zcf $rfs_name bin dev etc lib mnt overlay proc root sbin sys tmp update usr var www
+        if [ $? -eq 0 ]; then
+        message_success "Create ROOTFS archive successfully"
+        else
+        rm -fr $rfs_name
+        message_alarm "Can't create ROOTFS archive"
+        exit 1
+        fi
+        mv $rfs_name /update/
+}
+
+function copy_recovery {
+        cd /
+    if mount | grep /dev/$MMC$RECOVERY_PART > /dev/null; then
+        ls /dev/$MMC$RECOVERY_PART | xargs -n1 umount -l >> /dev/null 2>&1  ;
+        message_success "Unmount $MMC$RECOVERY_PART (Recovery) partition"
+    fi
+        mkdir -p /mnt/recovery; message_successy "Create /mnt/recovery dir"
+    if mount -t ext4 /dev/$MMC$RECOVERY_PART /mnt/recovery/ >> /dev/null 2>&1 ; then  message_success "Mount successfully /dev/$MMC$RECOVERY_PART partition"
+
+	else message_alarm "Can't mount /dev/$MMC$RECOVERY_PART (Recovery)" ; exit 1; 
+    fi
+
+    if mount | grep /dev/$MMC$cur_kernel_part >> /dev/null 2>&1 ; then
+        ls /dev/$MMC$cur_kernel_part | xargs -n1 umount -l >> /dev/null 2>&1  ;
+        message_success "Unmount $MMC$cur_kernel_part partition"
+    fi
+        mkdir -p /mnt/kernel; message_successy "Create /mnt/kernel dir"
+    if mount -t ext4 /dev/$MMC$cur_kernel_part /mnt/kernel/ >> /dev/null 2>&1 ; then  message_success "Mount successfully /dev/$MMC$cur_kernel_part partition"
+
+	else message_alarm "Can't mount /dev/$MMC$cur_kernel_part" ; exit 1; 
+    fi
+
+    cp /mnt/kernel/$fdt_name /update/$fdt_name
+    cp /mnt/kernel/$kernel_name /update/$kernel_name
+    sync;
+    umount /mnt/kernel
+
+
+
+    if	test -f "/update/$rfs_name" && test -f /update/$fdt_name && test -f /update/$kernel_name ;
+        then
+        message_successy "Copy files to RECOVERY partition"
+        cp /update/$fdt_name /mnt/recovery/$fdt_name
+        cp /update/$kernel_name /mnt/recovery/$kernel_name
+        cp /update/$rfs_name /mnt/recovery/$rfs_name
+        sync;
+        sync;
+        umount /mnt/recovery
+        rm -fr /update/*
+#        rm -fr $rfs_name
+        message_successy "Complete..."
+        else 
+        message_alarm "Recovery file(s) not found"
+        umount /mnt/recovery
+        rm -fr /update/*
+        exit 1
+
+    fi
+}
+
+function led_start_update {
+    if [ $model = "v1" ]; 
+    then
+    echo none > /sys/class/leds/led1green/trigger
+    echo heartbeat > /sys/class/leds/led1red/trigger
+    fi
+    echo heartbeat > /sys/class/leds/led2green/trigger
+    echo none > /sys/class/leds/led2green/trigger
+
+    echo heartbeat > /sys/class/leds/led2red/trigger
+}
+
+function led_update_success {
+    if [ $model = "v1" ]; 
+    then
+    echo none > /sys/class/leds/led1red/trigger
+    echo heartbeat > /sys/class/leds/led1green/trigger
+    fi
+    echo none > /sys/class/leds/led2red/trigger
+    echo default-on > /sys/class/leds/led2green/trigger
+    echo -e "${GREEN}*************UPDATE OK************${NOCOLOR}"
+}
+
+function update_all {
+case "$umode" in
+    f)
+        message_successy "TASK - Update DTB file"
+        update_dtb_kernel $cur_kernel_part $fdt_name
+        ;;
+    k)
+        message_successy "TASK - Update KERNEL file"
+        update_dtb_kernel $cur_kernel_part $kernel_name
+        ;;
+    fk)
+        message_successy "TASK - Update DTB & KERNEL files"
+        update_dtb_kernel $cur_kernel_part $fdt_name $kernel_name
+        ;;
+    r)
+        message_successy "TASK - Update ROOTFS"
+        update_rootfs 
+        fw_setenv fspart $nfspart
+        ;;
+    u)
+        message_successy "TASK - Update U-BOOT"
+        update_uboot
+        ;;
+    fkr)
+        message_successy "TASK - Update DTB & KERNEL & ROOTFS files"
+        update_dtb_kernel $new_kernel_part $fdt_name $kernel_name
+        update_rootfs
+        fw_setenv fspart $nfspart
+        fw_setenv mmcpart $kpart
+        ;; 
+    fkru)
+        message_successy "TASK - Update DTB & KERNEL & ROOTFS files and U-BOOT"
+        update_uboot
+        update_dtb_kernel $new_kernel_part $fdt_name $kernel_name
+        update_rootfs
+        fw_setenv fspart $nfspart
+        fw_setenv mmcpart $kpart
+        ;;         
+    *)       
+        exit 1
+esac
+}
+
+function end_update {
+        rm -fr /update/*
+        message_successy "Clear /update /tmp dir..."
+        message_success "Complete..."
+        message_success "System will reboot now..."
+        led_update_success
+        fw_setenv update yes
+        /sbin/reboot
+}
+
+function start_update {
+        led_start_update
+        decrypt_image
+        check_files
+        update_all
+        end_update
+}
+
+function start_update_test {
+        led_start_update
+        check_files
+        update_all
+        end_update
+}
+
+function exit_error {
+        exit 1
+}
+
+#Start script
+        get_partitions
+        show_info
+
+    if [ $HELP -eq 1 ]; then
+        echo "Usage $0 -f <image file name> [option]"
+        echo "      -f    file name"
+        echo "      -m    [usb|network|local]"  
+        echo "      -b    eneble export Backup List"
+        echo "      -e    disable save /etc/"
+        echo "      -k    path to key"
+        echo "      -n    set IP address"
+        echo "      -v    disable messages"
+        echo "example1 - full update from USB Flash Drive"
+        echo "update -f openwrt-update-full.bin -m usb"
+        echo "example2 - dtb update from network"
+        echo "update -f openwrt-update-dtb.bin -n 192.168.2.32:3034/bin/ "
+        echo "example3 - rootfs update from local (/update) without /etc/ save"
+        echo "update -f openwrt-update-rootfs.bin -m local -e" 
+        exit 0
+    fi    
+
+
+
+    if [ $TEST -eq 1 ]; then
+        mv /tmp/$FILE_IMAGE /update/$FILE_IMAGE;
+        rm -fr /tmp/$FILE_IMAGE
+        decrypt_image
+        check_files
+		SUCCESS=$?
+        return $SUCCESS
+    fi
+
+	if [ $FORCE -eq 1 ]; then 
+		reset_env
+	fi
+
+	message_successy "Check UPDATE Mode"
+
+case "$MODE" in
+    AUTO)
+		message_successy "Update AUTO mode"
+        start_update_test
+        exit 0
+        ;;
+    network)
+        message_successy "Update from network"
+        rm -fr /update/*
+		message_successy "Try to download with wget"
+        wget $IPADDRESS$FILE_IMAGE -O /update/$FILE_IMAGE
+	if [ $? -ne 0 ]; then	
+		message_alarm "Download with wget failed"
+		message_successy "Try to download with curl"
+        curl -o /update/$FILE_IMAGE $IPADDRESS$FILE_IMAGE
+		fi
+
+        SUCCESS=$?
+        if [ $SUCCESS -ne 0 ]; then message_alarm "$FILE_IMAGE download failed... Exit"; exit 1
+        else message_success "$FILE_IMAGE download successfully..."
+        fi
+        ;;
+    usb) 
+        message_successy "Update from USB Flash Drive"
+        if mount | grep /dev/$USBD > /dev/null; then
+        ls /dev/$USBD | xargs -n1 umount -l >> /dev/null 2>&1  ;
+        message_successy "Unmount /dev/$USBD (USB Flash Drive) partition"
+        fi
+        mkdir -p /mnt/usb; message_successy "Create /mnt/usb dir"
+
+        if mount /dev/$USBD /mnt/usb ;  then  message_success "Mount successfully /dev/$USBD"
+	    else message_alarm "Can't mount /dev/$USBD" ; exit 1
+        fi 
+
+        usb_path="/mnt/usb/teupdate/$FILE_IMAGE"
+
+        if test -f $usb_path; then message_success "Found update file on USB Flash Drive"
+        else message_alarm "Not found update file $usb_path"
+        fi
+        
+        cp -fr $usb_path /update/$FILE_IMAGE 
+        if [ $? -ne 0 ]; then 
+        message_alarm "Can't copy from USB Flash Drive" 
+        exit 1
+        fi
+        ;;
+    local)
+        if test -f /update/$FILE_IMAGE; then message_success "Found update file in /update"
+        else message_alarm "Not found update file in /update"
+        exit_error
+        fi
+        ;;
+    reset)
+        message_successy "Reset update bits"
+        reset_env
+		led_update_success
+        exit 0
+        ;;
+    restore)
+        led_start_update
+        message_successy "Restore system from Recovery"
+        fw_setenv recoverymod yes;
+        /sbin/reboot;
+		exit 0
+        ;;
+    recovery)
+        led_start_update
+        message_successy "Start to create RECOVERY image"
+        rm -fr /update/*
+        create_recovery_rfs
+        copy_recovery
+        led_update_success
+        message_success "Create RECOVERY image Complete..."
+        echo "Now press and hold 10 sec Recovery button and reset PLC to full recovery..."
+        exit 0
+        ;;    
+    *)
+	    message_alarm "Usage: $0 {reset|local|usb|network|restore} {dtb|zImage|kernel|rootfs|all|auto} {nocheck|*"
+        exit 1
+esac
+        start_update
+
+exit $?        
+
+
+

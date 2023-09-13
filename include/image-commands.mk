@@ -481,6 +481,75 @@ define Build/senao-header
 	mv $@.new $@
 endef
 
+define Build/supugrade
+        rm -rf $(KDIR_TMP)/$(DEVICE_NAME)/sup
+        mkdir -p $(KDIR_TMP)/$(DEVICE_NAME)/sup
+        rm -fr $(BIN_DIR)/update
+        rm -fr $(BIN_DIR)/mfgtool
+        mkdir -p $(BIN_DIR)/update
+        mkdir -p $(BIN_DIR)/mfgtool
+        cp $(BIN_DIR)/$(DEVICE_IMG_PREFIX)-zImage $(KDIR_TMP)/$(DEVICE_NAME)/sup/
+        cp $(BIN_DIR)/$(DEVICE_IMG_PREFIX)-rootfs.tar.gz $(KDIR_TMP)/$(DEVICE_NAME)/sup/
+        cp $(BIN_DIR)/$(IMG_PREFIX)-$(DEVICE_DTS).dtb $(KDIR_TMP)/$(DEVICE_NAME)/sup/
+	cp $(BIN_DIR)/u-boot-$(DEVICE_NAME)/u-boot.imx $(KDIR_TMP)/$(DEVICE_NAME)/sup/
+
+	pushd $(KDIR_TMP)/$(DEVICE_NAME)/sup/ && md5sum u-boot.imx  > uboot.md5 && popd
+        pushd $(KDIR_TMP)/$(DEVICE_NAME)/sup/ && md5sum $(DEVICE_IMG_PREFIX)-zImage  > zimage.md5 && popd
+        pushd $(KDIR_TMP)/$(DEVICE_NAME)/sup/ && md5sum $(IMG_PREFIX)-$(DEVICE_DTS).dtb > dtb.md5 && popd
+        pushd $(KDIR_TMP)/$(DEVICE_NAME)/sup/ && md5sum $(DEVICE_IMG_PREFIX)-rootfs.tar.gz > rootfs.md5 && popd
+
+	pushd $(KDIR_TMP)/$(DEVICE_NAME)/sup/ && head -c 32 uboot.md5  > up-uboot.md5 && popd
+        pushd $(KDIR_TMP)/$(DEVICE_NAME)/sup/ && head -c 32 zimage.md5  > up-zimage.md5 && popd
+        pushd $(KDIR_TMP)/$(DEVICE_NAME)/sup/ && head -c 32 dtb.md5  > up-dtb.md5 && popd
+        pushd $(KDIR_TMP)/$(DEVICE_NAME)/sup/ && head -c 32 rootfs.md5  > up-rootfs.md5 && popd
+
+        pushd $(KDIR_TMP)/$(DEVICE_NAME)/sup/ && cat up-uboot.md5 u-boot.imx > upd-u-boot.imx && popd
+	pushd $(KDIR_TMP)/$(DEVICE_NAME)/sup/ && cat up-zimage.md5 $(DEVICE_IMG_PREFIX)-zImage > upd-$(DEVICE_IMG_PREFIX)-zImage && popd
+        pushd $(KDIR_TMP)/$(DEVICE_NAME)/sup/ && cat up-dtb.md5 $(IMG_PREFIX)-$(DEVICE_DTS).dtb > upd-$(IMG_PREFIX)-$(DEVICE_DTS).dtb && popd
+        pushd $(KDIR_TMP)/$(DEVICE_NAME)/sup/ && cat up-rootfs.md5 $(DEVICE_IMG_PREFIX)-rootfs.tar.gz > upd-$(DEVICE_IMG_PREFIX)-rootfs.tar.gz && popd
+
+	cp -fr $(TOPDIR)/package/base-files/files/etc/version-te $(KDIR_TMP)/$(DEVICE_NAME)/sup/version-te
+
+	pushd $(KDIR_TMP)/$(DEVICE_NAME)/sup/ &&  tar cvf $(BIN_DIR)/files.tar upd-$(DEVICE_IMG_PREFIX)-zImage upd-$(IMG_PREFIX)-$(DEVICE_DTS).dtb upd-$(DEVICE_IMG_PREFIX)-rootfs.tar.gz upd-u-boot.imx version-te && popd
+        openssl enc -aes-256-cbc -pass file:$(TOPDIR)/target/linux/imx6ul/key/key.txt < $(BIN_DIR)/files.tar > $(BIN_DIR)/openwrt-update-full-uboot.bin
+
+	pushd $(KDIR_TMP)/$(DEVICE_NAME)/sup/ &&  tar cvf $(BIN_DIR)/files.tar upd-$(DEVICE_IMG_PREFIX)-zImage upd-$(IMG_PREFIX)-$(DEVICE_DTS).dtb upd-$(DEVICE_IMG_PREFIX)-rootfs.tar.gz version-te && popd
+        openssl enc -aes-256-cbc -pass file:$(TOPDIR)/target/linux/imx6ul/key/key.txt < $(BIN_DIR)/files.tar > $(BIN_DIR)/openwrt-update-full.bin
+
+	pushd $(KDIR_TMP)/$(DEVICE_NAME)/sup/ &&  tar cvf $(BIN_DIR)/files.tar upd-$(DEVICE_IMG_PREFIX)-zImage version-te && popd
+        openssl enc -aes-256-cbc -pass file:$(TOPDIR)/target/linux/imx6ul/key/key.txt < $(BIN_DIR)/files.tar > $(BIN_DIR)/openwrt-update-kernel.bin
+
+	pushd $(KDIR_TMP)/$(DEVICE_NAME)/sup/ &&  tar cvf $(BIN_DIR)/files.tar upd-$(DEVICE_IMG_PREFIX)-zImage upd-$(IMG_PREFIX)-$(DEVICE_DTS).dtb version-te && popd
+        openssl enc -aes-256-cbc -pass file:$(TOPDIR)/target/linux/imx6ul/key/key.txt < $(BIN_DIR)/files.tar > $(BIN_DIR)/openwrt-update-kernel-dtb.bin
+
+	pushd $(KDIR_TMP)/$(DEVICE_NAME)/sup/ &&  tar cvf $(BIN_DIR)/files.tar upd-$(DEVICE_IMG_PREFIX)-rootfs.tar.gz version-te && popd
+        openssl enc -aes-256-cbc -pass file:$(TOPDIR)/target/linux/imx6ul/key/key.txt < $(BIN_DIR)/files.tar > $(BIN_DIR)/openwrt-update-rootfs.bin
+
+	pushd $(KDIR_TMP)/$(DEVICE_NAME)/sup/ &&  tar cvf $(BIN_DIR)/files.tar upd-$(IMG_PREFIX)-$(DEVICE_DTS).dtb  version-te && popd
+        openssl enc -aes-256-cbc -pass file:$(TOPDIR)/target/linux/imx6ul/key/key.txt < $(BIN_DIR)/files.tar > $(BIN_DIR)/openwrt-update-dtb.bin
+
+	pushd $(KDIR_TMP)/$(DEVICE_NAME)/sup/ &&  tar cvf $(BIN_DIR)/files.tar upd-u-boot.imx  version-te && popd
+        openssl enc -aes-256-cbc -pass file:$(TOPDIR)/target/linux/imx6ul/key/key.txt < $(BIN_DIR)/files.tar > $(BIN_DIR)/openwrt-update-uboot.bin
+
+        mv  $(BIN_DIR)/openwrt-update-full.bin $(BIN_DIR)/update/
+	mv  $(BIN_DIR)/openwrt-update-kernel.bin $(BIN_DIR)/update/
+	mv  $(BIN_DIR)/openwrt-update-kernel-dtb.bin $(BIN_DIR)/update/
+	mv  $(BIN_DIR)/openwrt-update-rootfs.bin $(BIN_DIR)/update/
+	mv  $(BIN_DIR)/openwrt-update-dtb.bin $(BIN_DIR)/update/
+	mv  $(BIN_DIR)/openwrt-update-full-uboot.bin $(BIN_DIR)/update/
+	mv  $(BIN_DIR)/openwrt-update-uboot.bin $(BIN_DIR)/update/
+
+        cp -fr $(TOPDIR)/package/base-files/files/etc/version-te $(BIN_DIR)/update/update.txt
+        touch $(BIN_DIR)/update/force
+
+        cp $(BIN_DIR)/$(DEVICE_IMG_PREFIX)-zImage $(BIN_DIR)/mfgtool/
+        cp $(BIN_DIR)/$(IMG_PREFIX)-$(DEVICE_DTS).dtb $(BIN_DIR)/mfgtool/
+        cp $(BIN_DIR)/$(DEVICE_IMG_PREFIX)-rootfs.tar.gz $(BIN_DIR)/mfgtool/
+	cp $(BIN_DIR)/u-boot-$(DEVICE_NAME)/u-boot.imx $(BIN_DIR)/mfgtool/
+endef
+
+
+
 define Build/sysupgrade-tar
 	sh $(TOPDIR)/scripts/sysupgrade-tar.sh \
 		--board $(if $(BOARD_NAME),$(BOARD_NAME),$(DEVICE_NAME)) \

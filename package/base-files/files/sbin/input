@@ -1,0 +1,19 @@
+#!/bin/sh
+
+pin=""
+gpio=`gpiofind "DIN$1"  2>&1`
+pin=`gpioget $gpio 2>&1`;
+
+case "$pin" in
+        1)
+        echo OFF
+        ;;
+        0)
+        echo ON
+        ;;
+        *)
+        echo "Input not found"
+        exit 1
+esac
+exit $?
+

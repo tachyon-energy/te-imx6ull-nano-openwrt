@@ -143,7 +143,6 @@ nand_upgrade_prepare_ubi() {
 		ubiattach -m "$mtdnum"
 		sync
 		ubidev="$( nand_find_ubi "$CI_UBIPART" )"
-		[ ! "$ubidev" ] && return 1
 		[ "$has_env" -gt 0 ] && {
 			ubimkvol /dev/$ubidev -n 0 -N ubootenv -s 1MiB
 			ubimkvol /dev/$ubidev -n 1 -N ubootenv2 -s 1MiB
@@ -155,13 +154,8 @@ nand_upgrade_prepare_ubi() {
 	local data_ubivol="$( nand_find_volume $ubidev rootfs_data )"
 
 	local ubiblk ubiblkvol
-	for ubiblk in /dev/ubiblock${ubidev:3}_* ; do
+	for ubiblk in /dev/ubiblock*_? ; do
 		[ -e "$ubiblk" ] || continue
-		case "$ubiblk" in
-		/dev/ubiblock*_*p*)
-			continue
-			;;
-		esac
 		echo "removing ubiblock${ubiblk:13}"
 		ubiblkvol=ubi${ubiblk:13}
 		if ! ubiblock -r /dev/$ubiblkvol; then
@@ -171,9 +165,9 @@ nand_upgrade_prepare_ubi() {
 	done
 
 	# kill volumes
-	[ "$kern_ubivol" ] && ubirmvol /dev/$ubidev -N $CI_KERNPART || :
-	[ "$root_ubivol" -a "$root_ubivol" != "$kern_ubivol" ] && ubirmvol /dev/$ubidev -N $CI_ROOTPART || :
-	[ "$data_ubivol" ] && ubirmvol /dev/$ubidev -N rootfs_data || :
+	[ "$kern_ubivol" ] && ubirmvol /dev/$ubidev -N $CI_KERNPART || true
+	[ "$root_ubivol" -a "$root_ubivol" != "$kern_ubivol" ] && ubirmvol /dev/$ubidev -N $CI_ROOTPART || true
+	[ "$data_ubivol" ] && ubirmvol /dev/$ubidev -N rootfs_data || true
 
 	# update kernel
 	if [ -n "$kernel_length" ]; then
@@ -199,15 +193,18 @@ nand_upgrade_prepare_ubi() {
 
 	# create rootfs_data for non-ubifs rootfs
 	if [ "$rootfs_type" != "ubifs" ]; then
+		local availeb=$(cat /sys/devices/virtual/ubi/$ubidev/avail_eraseblocks)
+		local ebsize=$(cat /sys/devices/virtual/ubi/$ubidev/eraseblock_size)
+		local avail_size=$((availeb * ebsize))
 		local rootfs_data_size_param="-m"
-		if [ -n "$rootfs_data_max" ]; then
+		if [ -n "$rootfs_data_max" ] &&
+		   [ "$rootfs_data_max" != "0" ] &&
+		   [ "$rootfs_data_max" -le "$avail_size" ]; then
 			rootfs_data_size_param="-s $rootfs_data_max"
 		fi
 		if ! ubimkvol /dev/$ubidev -N rootfs_data $rootfs_data_size_param; then
-			if ! ubimkvol /dev/$ubidev -N rootfs_data -m; then
-				echo "cannot initialize rootfs_data volume"
-				return 1
-			fi
+			echo "cannot initialize rootfs_data volume"
+			return 1
 		fi
 	fi
 	sync

@@ -1,0 +1,53 @@
+#/bin/sh
+
+function collect {
+relay=`gpioinfo | grep -i relay* | grep -v EN_RELAY | awk '{print $3}' | tr -d '"' | sed 's/RELAY//g'`
+        for i in ${relay}
+         do
+          case "$1" in
+            on) gpioset  `gpiofind "EN_RELAY"`=1
+                ;;
+            off)gpioset  `gpiofind "EN_RELAY"`=0
+                ;;
+            *)  echo Unknow condition
+          esac
+
+
+         done
+}
+
+case "$2" in
+  on)
+        logger "relay$1 on"
+
+        if [ "$1" = "all" ]; then
+            echo ALL_SELECT
+            gpioset  `gpiofind "EN_RELAY"`=1
+            gpioset  `gpiofind "EN_TBD"`=0
+            collect on
+        else
+            echo $1 select
+            gpioset  `gpiofind "RELAY$1"`=1
+            gpioset  `gpiofind "EN_TBD"`=0
+            gpioset  `gpiofind "EN_RELAY"`=1
+        fi
+        ;;
+  off)
+        logger "relay$1 off"
+        if [ "$1" = "all" ]; then
+            echo ALL_SELECT
+            gpioset  `gpiofind "EN_RELAY"`=0
+            gpioset  `gpiofind "EN_TBD"`=0
+            collect off
+        else
+            echo $1 select
+            gpioset  `gpiofind "RELAY$1"`=0
+        fi
+        ;;
+    *)
+        echo "Usage: $0 {on|off}"
+        exit 1
+esac
+
+exit $?
+

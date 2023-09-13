@@ -1,0 +1,13 @@
+#!/bin/sh /etc/rc.common
+# Copyright (C) 2006 OpenWrt.org
+
+START=5
+STOP=
+
+start() {
+        name=`dd if=/sys/bus/nvmem/devices/imx-ocotp0/nvmem bs=4 count=2 skip=38 2>/dev/null | hexdump -e "16 \"%_p\" \"\\n\""`
+        uci set system.@system[0].hostname="TE-$name"
+        uci commit system
+        /etc/init.d/system reload
+}
+

@@ -1,0 +1,5 @@
+
+while true
+do 
+	iwlist wlan0 scan | grep 'ESSID\|Quality\|Freqency'
+done

@@ -1,0 +1,26 @@
+#/bin/sh
+
+
+
+case "$1" in
+  on)
+        logger "LoRa on"
+	gpioset  `gpiofind "LORA_RST"`=1
+        ;;
+  off)
+        logger "LoRa off"
+	gpioset  `gpiofind "LORA_RST"`=0
+        ;;
+  reset)
+        logger "LoRa reset"
+	gpioset  `gpiofind "LORA_RST"`=0
+        sleep 1
+        gpioset  `gpiofind "LORA_RST"`=1
+        ;;
+  *)
+        echo "Usage: $0 {on|off|reset}"
+        exit 1
+esac
+
+exit $?
+

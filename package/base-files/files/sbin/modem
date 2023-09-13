@@ -1,0 +1,51 @@
+#/bin/sh
+
+
+
+case "$1" in
+  on)
+        logger "modem on"
+	gpioset  `gpiofind "EN_GSM_PWR"`=1
+	gpioset  `gpiofind "MODEM_POWERKEY"`=1
+	gpioset  `gpiofind "MODEM_RESET"`=1
+        sleep 2
+        gpioset  `gpiofind "MODEM_POWERKEY"`=0
+        sleep 1
+	gpioset  `gpiofind "MODEM_POWERKEY"`=1
+        ;;
+  off)
+        logger "modem off"
+        gpioset  `gpiofind "EN_GSM_PWR"`=0
+	gpioset  `gpiofind "MODEM_POWERKEY"`=0
+	sleep 2
+	gpioset  `gpiofind "MODEM_POWERKEY"`=1
+        ;;
+  restart)
+        logger "modem restart"
+        "$0" off
+        sleep 2
+        "$0" on
+        ;;
+  reset)
+        logger "modem reset"
+        gpioset  `gpiofind "MODEM_RESET"`=0
+        sleep 1
+        gpioset  `gpiofind "MODEM_RESET"`=1
+        ;;
+  sim1)
+        logger "modem set SIM1 "
+        gpioset  `gpiofind "SIMselect"`=0
+        "$0" restart
+        ;;
+  sim2)
+        logger "modem set SIM2 "
+        gpioset  `gpiofind "SIMselect"`=0
+        "$0" restart
+        ;;
+  *)
+        echo "Usage: $0 {on|off|reset|sim1|sim2}"
+        exit 1
+esac
+
+exit $?
+

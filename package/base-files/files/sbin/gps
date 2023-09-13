@@ -1,0 +1,26 @@
+#/bin/sh
+
+
+
+case "$1" in
+  on)
+        logger "GPS on"
+	gpioset  `gpiofind "RESET_GPS"`=1
+        ;;
+  off)
+        logger "GPS off"
+	gpioset  `gpiofind "RESET_GPS"`=0
+        ;;
+  reset)
+        logger "GPS reset"
+	gpioset  `gpiofind "RESET_GPS"`=0
+        sleep 1
+        gpioset  `gpiofind "RESET_GPS"`=1
+        ;;
+  *)
+        echo "Usage: $0 {on|off|reset}"
+        exit 1
+esac
+
+exit $?
+

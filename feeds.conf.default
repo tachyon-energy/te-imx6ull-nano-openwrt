@@ -1,4 +1,5 @@
 src-git-full packages https://git.openwrt.org/feed/packages.git;openwrt-22.03
-src-git-full luci https://git.openwrt.org/project/luci.git;openwrt-22.03
+src-git-full luci https://github.com/tachyon-energy/te-imx6ull-nano-openwrt-luci.git;openwrt-22.03-te-imx6ull-nano
 src-git-full routing https://git.openwrt.org/feed/routing.git;openwrt-22.03
 src-git-full telephony https://git.openwrt.org/feed/telephony.git;openwrt-22.03
+src-git node https://github.com/nxhack/openwrt-node-packages.git;openwrt-22.03

@@ -1,0 +1,809 @@
+/*
+ * Copyright (C) 2015 Freescale Semiconductor, Inc.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ */
+
+ /*
+  * TE-iMX6ULL-NANO-CPU-V2 PLC
+  * www.tachyon.energy
+  * contact  d.konnor@tachyon.energy
+  */
+
+/dts-v1/;
+
+#include "imx6ull.dtsi"
+
+
+
+
+/ {
+        model = "Tachyon Energy TE-iMX6ULL-NANO";
+        compatible = "fsl,imx6ull-14x14-evk", "fsl,imx6ull";
+
+        memory {
+                reg = <0x80000000 0x20000000>;
+        };
+
+        chosen {
+                stdout-path = &uart1;
+        };
+
+       
+        regulators {
+                compatible = "simple-bus";
+                #address-cells = <1>;
+                #size-cells = <0>;
+
+                reg_sd1_vmmc: regulator-sd1 {                           // WiFi Power
+                        compatible = "regulator-fixed";
+                        reg = <1>;
+                        regulator-name = "VSD_3V3";
+                        regulator-min-microvolt = <3300000>;
+                        regulator-max-microvolt = <3300000>;
+                        gpio = <&gpio3 1 GPIO_ACTIVE_HIGH>;
+			            enable-active-high;
+                        regulator-always-on;
+                };
+
+
+
+		usdhc1_pwrseq: usdhc1_pwrseq {
+                        compatible = "mmc-pwrseq-simple";
+                        reset-gpios = <&gpio3 4 GPIO_ACTIVE_LOW>;      // WL_REG_ON
+                };
+
+
+
+                reg_usb1_vbus: regulator-usb1 {
+                        compatible = "regulator-fixed";                 // TE
+                        reg = <2>;
+                        regulator-name = "usb1_vbus";
+                        regulator-min-microvolt = <5000000>;
+                        regulator-max-microvolt = <5000000>;
+                        gpio = <&gpio1 14 GPIO_ACTIVE_HIGH>;
+			            enable-active-high;
+                        regulator-always-on;
+                };
+
+
+                reg_usb2_vbus: regulator-usb2 {
+                        compatible = "regulator-fixed";                 // TE
+                        reg = <3>;
+                        regulator-name = "usb2_vbus";
+                        regulator-min-microvolt = <5000000>;
+                        regulator-max-microvolt = <5000000>;
+                        regulator-always-on;
+                };
+
+                reg_can_xcvr: regulator-canxcvr {
+                        compatible = "regulator-fixed";                 // TE
+                        reg = <4>;
+                        regulator-name = "CAN_XCVR";
+                        regulator-min-microvolt = <3300000>;
+                        regulator-max-microvolt = <3300000>;
+                        regulator-always-on;
+    		    };
+
+                reg_3G_modem: regulator-3gmodem {                       // TBD 0-0-0
+                        compatible = "regulator-fixed";
+                        reg = <5>;
+                        regulator-name = "3G_MODEM";
+                        regulator-min-microvolt = <3600000>;
+                        regulator-max-microvolt = <4000000>;
+                        gpio = <&pcf8574a_1 6 GPIO_ACTIVE_HIGH>;
+			            enable-active-high;
+                        regulator-always-on;
+    		    };   
+
+                reg_lora: regulator-lora {
+                        compatible = "regulator-fixed";
+                        reg = <6>;
+                        regulator-name = "LoRa";
+                        regulator-min-microvolt = <3300000>;
+                        regulator-max-microvolt = <3300000>;
+                        regulator-always-on;
+    		    };      
+
+                reg_gps: regulator-gps {
+                        compatible = "regulator-fixed";
+                        reg = <7>;
+                        regulator-name = "GPS";
+                        regulator-min-microvolt = <3300000>;
+                        regulator-max-microvolt = <3300000>;
+                        regulator-always-on;
+    		    };               
+
+    		    reg_3p3v: regulator-3p3v {
+                        compatible = "regulator-fixed";
+                        reg = <9>;
+                        regulator-name = "3P3V";
+                        regulator-min-microvolt = <3300000>;
+                        regulator-max-microvolt = <3300000>;
+                        regulator-always-on;
+                        regulator-boot-on;
+                };
+
+        };
+
+
+        leds    {
+                        compatible = "gpio-leds";  
+                        pinctrl-names = "default";
+                        pinctrl-0 = <&pinctrl_led>; 
+
+                    led_module_green:led_green {                                                          // TE Green LED
+                        gpios = <&gpio1 8 GPIO_ACTIVE_LOW>;
+                        label = "ledM:green";
+                        default-state = "off";
+                        };
+                    led_module_red:led_red {                                                              // TE Red LED
+                        gpios = <&gpio1 5 GPIO_ACTIVE_LOW>;
+                        label = "ledM:red";
+                        default-state = "off";
+                        };
+                    led_module_blue:led_blue {                                                            // TE Blue LED
+                        gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
+                        label = "ledM:blue";
+                        default-state = "on";
+                        linux,default-trigger = "heartbeat";
+                        };
+
+                    led_ext4:led_ext4 {                                 // pin 18                         // TE LED2-BLUE
+                        gpios = <&gpio3 25 GPIO_ACTIVE_LOW>;
+                        label = "led2blue";
+                        default-state = "off";
+                        };
+                    led_ext5:led_ext5 {                                 // pin 24                         // TE LED-RED
+                        gpios = <&gpio3 26 GPIO_ACTIVE_LOW>;
+                        label = "led2red";
+                        default-state = "off";
+                        };
+                    led_ext6:led_ext6 {                                 // pin 4                          // TE LED2-GREEN
+                        gpios = <&gpio1 12 GPIO_ACTIVE_LOW>;
+                        label = "led2green";
+                        default-state = "on";
+                        };            
+            };        
+
+//Ethernet 0/1 LEDs (Speed and Link)                                                                 // CPU Board     
+        leds2   {
+                        compatible = "gpio-leds";
+
+                    led_100M:led_eth1 {                                                            // TE ETH Speed LED LED
+                        gpios = <&pcf8574a_3 6 GPIO_ACTIVE_LOW>;
+                        label = "led_speed";
+                        default-state = "on";
+                        linux,default-trigger = "20b4000.ethernet-1:01:100Mbps";
+                        };     
+                    led_link:led_eth2 {                                                            // TE ETH Speed LED LED
+                        gpios = <&pcf8574a_3 7 GPIO_ACTIVE_LOW>;
+                        label = "led_link";
+                        default-state = "on";
+                        linux,default-trigger = "20b4000.ethernet-1:01:link";
+                        };   
+
+                    led0_100M:led0_eth1 {                                                            // TE ETH Speed LED LED
+                        gpios = <&gpio1 22 GPIO_ACTIVE_LOW>;
+                        label = "led0_speed";
+                        default-state = "on";
+                        linux,default-trigger = "20b4000.ethernet-1:00:100Mbps";
+                        };     
+                    led0_link:led0_eth2 {                                                            // TE ETH Speed LED LED
+                        gpios = <&gpio1 23 GPIO_ACTIVE_LOW>;
+                        label = "led0_link";
+                        default-state = "on";
+                        linux,default-trigger = "20b4000.ethernet-1:00:link";
+                        };   
+
+        };
+
+        leds3   {                                                                                   // Modem board    
+                        compatible = "gpio-leds";
+
+                    led_lora_tx:led_lrw_tx {
+                        gpios = <&pcf8574a_1 5 GPIO_ACTIVE_LOW>;
+                        label = "lora_tx_green";
+                        default-state = "off";       
+                        };
+                    led_lora_link:led_lrw_link {
+                        gpios = <&pcf8574a_1 4 GPIO_ACTIVE_LOW>;
+                        label = "lora_link_red";
+                        default-state = "off";       
+                        };
+                    led_gps:led_gps {
+                        gpios = <&pcf8574a_1 2 GPIO_ACTIVE_LOW>;
+                        label = "lora_gps_blue";
+                        default-state = "off";       
+                        };                  
+        };
+
+       clocks {
+		            mclk: mclk {
+		            compatible = "fixed-clock";
+		            #clock-cells = <0>;
+		            clock-frequency = <24576000>;
+		};
+	};
+
+
+
+};
+
+&gpio1 {
+
+                gpio-line-names = 
+                        "", "", "EN_TBD", "", "", "", "", "",
+                        "", "MODEM_RESET", "REBOOT", "", "", "", "", "",
+                        "", "", "", "", "", "", "", "",
+                        "", "", "EN_RELAY", "", "", "", "", "";
+};
+
+&gpio3 {
+
+                gpio-line-names = 
+                        "", "WIFI_PWR_EN", "", "BT_REG_ON", "WL_REG_ON", "", "", "",
+                        "", "WL_HOST_WAKE", "", "", "", "", "", "BT_HOST_WAKE",
+                        "BT_WAKE", "", "", "", "", "", "", "",
+                        "", "", "", "", "", "", "", "";
+};
+
+&gpio4 {
+
+                gpio-line-names = 
+                        "", "", "", "", "", "", "", "",
+                        "", "", "", "", "", "", "", "",
+                        "", "", "", "", "MODEM_POWERKEY", "", "", "",
+                        "", "", "", "", "", "", "", "";
+};
+
+
+&clks {
+	assigned-clocks = <&clks IMX6UL_CLK_PLL4_AUDIO_DIV>;
+	assigned-clock-rates = <786432000>;
+};
+
+&cpu0 {
+        arm-supply = <&reg_arm>;
+        soc-supply = <&reg_soc>;
+};
+
+
+
+&uart1 {                                        // TE DUART console  
+        pinctrl-names = "default";
+        pinctrl-0 = <&pinctrl_uart1>;
+        status = "okay";
+};
+
+
+&uart2 {                                        // TE UART2 - RS485 interface 
+        pinctrl-names = "default";
+        pinctrl-0 = <&pinctrl_uart2>;
+        uart-has-rtscts;
+	linux,rs485-enabled-at-boot-time;
+        status = "okay";
+};
+
+&uart3 {                                        // TE UART3 - GPS IN 
+        pinctrl-names = "default";
+        pinctrl-0 = <&pinctrl_uart3>;
+        status = "okay";
+};
+
+&uart4 {                                        // TE UART4 - RS485 interface 
+        pinctrl-names = "default";
+        pinctrl-0 = <&pinctrl_uart4>;
+        uart-has-rtscts;
+	    linux,rs485-enabled-at-boot-time;
+        status = "okay";
+};
+
+&uart5 {                                        // TE UART5 - Bluetooth interface 
+        pinctrl-names = "default";
+        pinctrl-0 = <&pinctrl_uart5>;
+        uart-has-rtscts;
+        status = "okay";
+};
+
+&uart6 {                                        // TE LoRa Modem UART 
+        pinctrl-names = "default";
+        pinctrl-0 = <&pinctrl_uart6>;
+        status = "okay";
+};
+
+
+&can1 {
+        pinctrl-names = "default";              // TE CAN1 
+        pinctrl-0 = <&pinctrl_flexcan1>;
+        xceiver-supply = <&reg_can_xcvr>;
+        status = "okay";
+};
+
+&fec1 {
+        pinctrl-names = "default";
+        pinctrl-0 = <&pinctrl_enet1>;
+        phy-mode = "rmii";
+        phy-handle = <&ethphy0>;
+        phy-reset-gpios = <&gpio5 7 GPIO_ACTIVE_LOW>;
+        status = "okay";
+   
+};
+
+&fec2 {
+        pinctrl-names = "default";
+        pinctrl-0 = <&pinctrl_enet2>;
+        phy-mode = "rmii";
+        phy-handle = <&ethphy1>;
+        phy-reset-gpios = <&gpio3 20 GPIO_ACTIVE_LOW>;
+        status = "okay";
+
+                mdio {
+                #address-cells = <1>;
+                #size-cells = <0>;
+
+                ethphy1: ethernet-phy@1 {
+                        reg = <1>;
+                        compatible = "ethernet-phy-ieee802.3-c22";
+                        clocks = <&clks IMX6UL_CLK_ENET2_REF>;
+                        clock-names = "rmii-ref";                        
+                };
+
+                ethphy0: ethernet-phy@0 {
+                        reg = <0>;
+                        compatible = "ethernet-phy-ieee802.3-c22";
+                        clocks = <&clks IMX6UL_CLK_ENET_REF>;
+                        clock-names = "rmii-ref";                       
+                };
+
+
+        };
+};
+
+
+
+&gpc {
+        fsl,cpu_pupscr_sw2iso = <0x1>;
+        fsl,cpu_pupscr_sw = <0x0>;
+        fsl,cpu_pdnscr_iso2sw = <0x1>;
+        fsl,cpu_pdnscr_iso = <0x1>;
+        fsl,ldo-bypass = <0>; /* DCDC, ldo-enable */
+};
+
+&i2c2 {
+        clock_frequency = <100000>;             // TE
+        pinctrl-names = "default";
+        pinctrl-0 = <&pinctrl_i2c2>;
+        status = "okay";
+
+
+
+
+	pcf8574a_1: gpio@38 {                                     //GPIO Expander1 Modem/LOra PCB
+                                    // P0 - Not Used in Ver2
+                                    // P1 - Not Used in Ver2
+                                    // P2 - LED_GPS
+                	            // P3 - LORA_RST
+                                    // P4 - LED_LORA_LINK
+                    	            // P5 - LED_LORA_TX
+                                    // P6 - EN_GSM_PWR
+                                    // P7 - GPS_RESET
+                compatible = "nxp,pcf8574a";
+                reg = <0x38>;                                   // PCF8574A Address -0-0-0
+                gpio-controller;
+                #gpio-cells = <2>;
+                interrupt-parent = <&gpio3>;
+                interrupts = <28 0>;
+                lines-initial-states = <0xff>;
+                gpio-line-names = "", "", "", "LORA_RST",
+                                "", "", "EN_GSM_PWR", "RESET_GPS";
+                };
+
+        pcf8574a_2: gpio@39 {                                     //GPIO Expander2 Modem/LOra PCB TBD62381A Not Used Now
+                                    // P0 - DOUT1
+                                    // P1 - DOUT2
+                                    // P2 - DOUT3
+                	            // P3 - DOUT4
+                                    // P4 - DOUT5
+                    	            // P5 - DOUT6
+                                    // P6 - DOUT7
+                                    // P7 - DOUT8
+                compatible = "nxp,pcf8574a";
+                reg = <0x39>;                                   // PCF8574A Address -1-1-0
+                gpio-controller;
+                #gpio-cells = <2>;
+                lines-initial-states = <0xffff>;
+                gpio-line-names = "DOUT1", "DOUT2", "DOUT3", "DOUT4",
+                                "DOUT5", "DOUT6", "DOUT7", "DOUT8";
+                };
+
+       pcf8574a_3: gpio@3b {                                     //GPIO Expander3 TE-CPU-V1-PCB 
+                                    // P0 - Relay1
+                                    // P1 - Relay2
+                                    // P2 - Relay3
+                	            // P3 - Relay4
+                                    // P4 - Relay5
+                    	            // P5 - Relay6
+                                    // P6 - LED-100M
+                                    // P7 - LED-LINK
+                compatible = "nxp,pcf8574a";
+                reg = <0x3b>;                                   // PCF8574A Address -0-1-1
+                gpio-controller;
+                #gpio-cells = <2>;
+                lines-initial-states = <0xffff>;
+                gpio-line-names = "RELAY1", "RELAY2", "RELAY3", 
+                        "", "", "", "", "";
+//                        "RELAY4", "RELAY5", "RELAY6", "", "";
+                };
+
+	pcf8574a_4: gpio@3f {                                     //GPIO Expander4 TE-CPU-V1-PCB
+                                    // P0 - DIN1
+                                    // P1 - DIN2
+                                    // P2 - DIN3
+                	            // P3 - DIN4
+                                    // P4 - DIN5
+                    	            // P5 - DIN6
+                                    // P6 - DIN7
+                                    // P7 - DIN8
+                compatible = "nxp,pcf8574a";
+                reg = <0x3f>;                                   // PCF8574A Address -1-1-1
+                gpio-controller;
+                #gpio-cells = <2>;
+                interrupt-parent = <&gpio3>;
+                interrupts = <27 0>;
+                lines-initial-states = <0xff>;
+                gpio-line-names = "DIN1", "DIN2", "DIN3", "DIN4",
+                                "ADK1", "ADK2", "ADK3", "ADK4";
+                };
+
+
+
+        shtc3:  shtc3@44 {                        
+                        compatible = "sht3x";
+                        reg = <0x44>;
+                        label = "SHTC3";
+
+                };        
+
+        lis3dh: lis3dh@19 {
+                        compatible = "st,lis3dh-accel";
+			reg = <0x19>;
+                        vdd-supply = <&reg_3p3v>;
+			vddio-supply = <&reg_3p3v>;
+                        st,min-interval = <5>;
+			st,init-interval = <200>;
+			st,axis-map-x = <1>;
+			st,axis-map-y = <0>;
+			st,axis-map-z = <2>;
+			st,g-range = <2>;
+			st,negate-x;
+			st,negate-y;
+			st,negate-z;
+                };
+
+	ds2484: 1wire@18 {
+			compatible = "dallas,ds2482";
+			reg = <0x18>;
+		};
+
+        i2c_rtc: rtc@51 {
+                        compatible = "nxp,pcf8563";
+                        reg = <0x51>;
+                };
+
+        eeprom@57 {
+                compatible = "atmel,24c04";
+                reg = <0x57>;
+        };
+
+
+
+
+        pca9535a: gpio-expander@20 {							// TE-EXP-15R-Rev2A
+                compatible = "nxp,pca9535";
+                reg = <0x20>;
+                gpio-controller;
+                #gpio-cells = <2>;
+                gpio-line-names = "RELAY7", "RELAY8", "RELAY9", "RELAY10",
+                      "RELAY11", "RELAY12", "RELAY13", "RELAY14",
+                      "RELAY15", "RELAY16", "RELAY17", "RELAY18",
+                      "RELAY19", "RELAY20", "RELAY21", "";
+        };
+
+        pca9535b: gpio-expander@22 {							// TE-EXP-9R12i-Rev2A Relay Outputs
+                compatible = "nxp,pca9535";
+                reg = <0x22>;
+                gpio-controller;
+                #gpio-cells = <2>;
+                gpio-line-names = "RELAY22", "RELAY23", "RELAY24", "RELAY25",
+                      "RELAY26", "RELAY27", "RELAY28", "RELAY29",
+                      "RELAY30", "", "", "",
+                      "", "", "", "";
+        };
+
+	pca9535c: gpio-expander@24 {							// TE-EXP-9R12i-Rev2A
+                compatible = "nxp,pca9535";
+                reg = <0x24>;
+                gpio-controller;
+                #gpio-cells = <2>;
+                interrupt-parent = <&gpio3>;
+                interrupts = <28 0>;
+                interrupt-controller;
+                #interrupt-cells = <2>;
+                gpio-line-names = "DIN20", "DIN19", "DIN18", "DIN17",
+                      "DIN16", "DIN15", "DIN14", "DIN13",
+                      "DIN12", "DIN11", "DIN10", "DIN9",
+                      "", "", "", "";
+        };
+
+        ads7828@4a {
+                compatible = "ti,ads7828";
+                reg = <0x4a>;
+        };
+
+        mcp3428@68 {
+                compatible = "microchip,mcp3428";
+                reg = <0x68>;
+        };
+
+
+        
+
+};
+
+&usbotg1 {
+        dr_mode = "host";
+        srp-disable;
+        hnp-disable;
+        adp-disable;
+        pinctrl-names = "default";
+        pinctrl-0 = <&pinctrl_usb_otg1>;
+        vbus-supply = <&reg_usb1_vbus>;
+        status = "okay";
+};
+
+&usbotg2 {
+        vbus-supply = <&reg_usb2_vbus>;
+        dr_mode = "host";
+        disable-over-current;
+        pinctrl-names = "default";
+        pinctrl-0 = <&pinctrl_usb_otg2>;
+        status = "okay";
+};
+
+&usbphy1 {
+        tx-d-cal = <0x5>;
+};
+
+&usbphy2 {
+        tx-d-cal = <0x5>;
+};
+
+
+&usdhc1 {
+        #address-cells = <1>;
+        #size-cells = <0>;
+        pinctrl-names = "default";
+        pinctrl-0 = <&pinctrl_usdhc1>;
+        bus-width = <4>;
+        no-1-8-v;
+        non-removable;
+        mmc-pwrseq = <&usdhc1_pwrseq>;
+        status = "okay";
+
+        brcmf: bcrmf@1 {
+                reg = <1>;
+                compatible = "brcm,bcm4329-fmac", "brcm,bcm43xx-fmac";
+        };
+};
+
+
+
+&usdhc2 {
+        pinctrl-names = "default";
+        pinctrl-0 = <&pinctrl_usdhc2>;
+        bus-width = <8>;
+        no-1-8-v;
+        non-removable;
+        keep-power-in-suspend;
+        enable-sdio-wakeup;
+        status = "okay";
+};
+
+&iomuxc {
+        pinctrl-names = "default";
+        pinctrl-0 = <&pinctrl_hog>;
+        pinctrl_hog: hoggrp {
+                        fsl,pins = <
+                        >;
+                };
+
+                pinctrl_led: ledgrp {
+                        fsl,pins = <
+                                MX6UL_PAD_GPIO1_IO04__GPIO1_IO04        0x1b0b0         /* Blue LED              */
+                                MX6UL_PAD_GPIO1_IO05__GPIO1_IO05        0x1b0b0         /* Red LED               */
+                                MX6UL_PAD_GPIO1_IO08__GPIO1_IO08        0x1b0b0         /* Green LED             */
+
+                                MX6UL_PAD_JTAG_TDO__GPIO1_IO12          0x1b0b0
+                                MX6UL_PAD_LCD_DATA20__GPIO3_IO25        0x1b0b0
+                                MX6UL_PAD_LCD_DATA21__GPIO3_IO26        0x1b0b0
+
+                                MX6UL_PAD_UART2_CTS_B__GPIO1_IO22       0x1b0b0         
+                                MX6UL_PAD_UART2_RTS_B__GPIO1_IO23       0x1b0b0
+                        >;
+                };
+
+                pinctrl_w1_gpio: w1grp {
+                        fsl,pins = <
+                                MX6UL_PAD_JTAG_TMS__GPIO1_IO11          0x1a8b1         /* 0x30b0   0x1a8b1*/
+                                MX6UL_PAD_JTAG_TDI__GPIO1_IO13          0x1a8b1
+                        >;
+                };
+
+
+
+                pinctrl_enet1: enet1grp {
+                        fsl,pins = <
+                                MX6UL_PAD_ENET1_RX_EN__ENET1_RX_EN      0x1b0b0
+                                MX6UL_PAD_ENET1_RX_ER__ENET1_RX_ER      0x1b0b0
+                                MX6UL_PAD_ENET1_RX_DATA0__ENET1_RDATA00 0x1b0b0
+                                MX6UL_PAD_ENET1_RX_DATA1__ENET1_RDATA01 0x1b0b0
+                                MX6UL_PAD_ENET1_TX_EN__ENET1_TX_EN      0x1b0b0
+                                MX6UL_PAD_ENET1_TX_DATA0__ENET1_TDATA00 0x1b0b0
+                                MX6UL_PAD_ENET1_TX_DATA1__ENET1_TDATA01 0x1b0b0
+                                MX6UL_PAD_ENET1_TX_CLK__ENET1_REF_CLK1  0x4001b031
+                                MX6UL_PAD_SNVS_TAMPER7__GPIO5_IO07      0x0b0b0
+                        >;
+                };
+
+                pinctrl_enet2: enet2grp {
+                        fsl,pins = <
+                                MX6UL_PAD_GPIO1_IO07__ENET2_MDC         0x1b0b0
+                                MX6UL_PAD_GPIO1_IO06__ENET2_MDIO        0x1b0b0
+                                MX6UL_PAD_ENET2_RX_EN__ENET2_RX_EN      0x1b0b0
+                                MX6UL_PAD_ENET2_RX_ER__ENET2_RX_ER      0x1b0b0
+                                MX6UL_PAD_ENET2_RX_DATA0__ENET2_RDATA00 0x1b0b0
+                                MX6UL_PAD_ENET2_RX_DATA1__ENET2_RDATA01 0x1b0b0
+                                MX6UL_PAD_ENET2_TX_EN__ENET2_TX_EN      0x1b0b0
+                                MX6UL_PAD_ENET2_TX_DATA0__ENET2_TDATA00 0x1b0b0
+                                MX6UL_PAD_ENET2_TX_DATA1__ENET2_TDATA01 0x1b0b0
+                                MX6UL_PAD_ENET2_TX_CLK__ENET2_REF_CLK2  0x4001b031
+                                MX6UL_PAD_LCD_DATA15__GPIO3_IO20        0x1b0b0
+                        >;
+                };
+
+		pinctrl_i2c2: i2c2grp {
+                        fsl,pins = <
+                                       
+                                MX6UL_PAD_UART5_TX_DATA__I2C2_SCL       0x4001b8b0 
+                                MX6UL_PAD_UART5_RX_DATA__I2C2_SDA       0x4001b8b0
+                                MX6UL_PAD_LCD_DATA05__GPIO3_IO10        0x1b0b0         /* MPU6050 */
+                                MX6UL_PAD_LCD_DATA22__GPIO3_IO27        0x1b0b0         /* DINT2  */
+				MX6UL_PAD_GPIO1_IO00__GPIO1_IO00        0x1b0b0         /* DINT1  */
+                                MX6UL_PAD_LCD_DATA23__GPIO3_IO28        0x1b0b0         /* DINT - TE-EXP-9R12i-Rev2A */
+                                MX6UL_PAD_UART3_CTS_B__GPIO1_IO26       0x1b0b0         /* Enable Relay Power pin       */
+				MX6UL_PAD_GPIO1_IO02__GPIO1_IO02        0x1b0b0         /* EN_TBD Rest pin  */
+                        >;
+                };
+
+                pinctrl_uart1: uart1grp {
+                        fsl,pins = <
+                                MX6UL_PAD_UART1_TX_DATA__UART1_DCE_TX   0x1b0b1           
+                                MX6UL_PAD_UART1_RX_DATA__UART1_DCE_RX   0x1b0b1
+                        >;
+                };
+
+                pinctrl_uart2: uart2grp {
+                        fsl,pins = <
+                                MX6UL_PAD_UART2_TX_DATA__UART2_DCE_TX   0x1b0b0         
+                                MX6UL_PAD_UART2_RX_DATA__UART2_DCE_RX   0x1b0b0
+                                MX6UL_PAD_UART3_TX_DATA__UART2_DCE_CTS  0x1b0b0       
+                        >;
+                };
+
+                pinctrl_uart3: uart3grp {
+                        fsl,pins = <        
+                                MX6UL_PAD_UART3_RX_DATA__UART3_DCE_RX   0x1b0b1     
+                        >;
+                };
+
+
+                pinctrl_uart4: uart4grp {
+                        fsl,pins = <
+                                MX6UL_PAD_UART4_TX_DATA__UART4_DCE_TX   0x1b0b0        
+                                MX6UL_PAD_UART4_RX_DATA__UART4_DCE_RX   0x1b0b0
+                                MX6UL_PAD_LCD_HSYNC__UART4_DCE_CTS      0x1b0b0
+                        >;
+                };
+
+                pinctrl_uart5: uart5grp {                                               // Bluetooth UART
+                        fsl,pins = <   
+                                MX6UL_PAD_CSI_DATA00__UART5_DCE_TX      0x1b0b1                                    
+                                MX6UL_PAD_CSI_DATA01__UART5_DCE_RX      0x1b0b1         
+                                MX6UL_PAD_CSI_DATA02__UART5_DCE_RTS     0x1b0b1
+                                MX6UL_PAD_CSI_DATA03__UART5_DCE_CTS     0x1b0b1
+                                MX6UL_PAD_GPIO1_IO03__OSC32K_32K_OUT    0x14            // 32kHz output      
+                                MX6UL_PAD_LCD_VSYNC__GPIO3_IO03         0x1b0b0         // BT_REG_ON
+                                MX6UL_PAD_LCD_DATA10__GPIO3_IO15        0x1b0b0         // BT_HOST_WAKE
+                                MX6UL_PAD_LCD_DATA11__GPIO3_IO16        0x1b0b0         // BT_WAKE
+
+                        >;
+                };
+
+                pinctrl_uart6: uart6grp {
+                        fsl,pins = <
+                                MX6UL_PAD_CSI_MCLK__UART6_DCE_TX        0x1b0b1
+                                MX6UL_PAD_CSI_PIXCLK__UART6_DCE_RX      0x1b0b1
+                        >;
+                };
+
+                pinctrl_flexcan1: flexcan1grp {
+                        fsl,pins = <
+                                MX6UL_PAD_LCD_DATA08__FLEXCAN1_TX      0x0b0b0
+                                MX6UL_PAD_LCD_DATA09__FLEXCAN1_RX      0x0b0b0
+                >;
+                };
+
+
+                pinctrl_sai1: sai1grp {
+                        fsl,pins = <
+                                MX6UL_PAD_CSI_DATA04__SAI1_TX_SYNC      0x1b0b0
+                                MX6UL_PAD_CSI_DATA05__SAI1_TX_BCLK      0x1b0b0
+                                MX6UL_PAD_CSI_DATA06__SAI1_RX_DATA      0x110b0
+                                MX6UL_PAD_CSI_DATA07__SAI1_TX_DATA      0x1f0b8
+                >;
+                };
+
+
+                
+
+/* USDH1 - WIFI */
+		pinctrl_usdhc1: usdhc1grp {
+                        fsl,pins = <
+                                MX6UL_PAD_SD1_CMD__USDHC1_CMD           0x17059               
+                                MX6UL_PAD_SD1_CLK__USDHC1_CLK           0x10059               
+                                MX6UL_PAD_SD1_DATA0__USDHC1_DATA0       0x17059
+                                MX6UL_PAD_SD1_DATA1__USDHC1_DATA1       0x17059
+                                MX6UL_PAD_SD1_DATA2__USDHC1_DATA2       0x17059
+                                MX6UL_PAD_SD1_DATA3__USDHC1_DATA3       0x17059              
+                                MX6UL_PAD_LCD_RESET__GPIO3_IO04         0x1b0b0               // WL_REG_ON  
+                                MX6UL_PAD_LCD_DATA04__GPIO3_IO09        0x1b0b0               // WL_HOST_WAKE
+                                MX6UL_PAD_LCD_ENABLE__GPIO3_IO01        0x1b0b0               // WIFI_PWR_EN
+                         
+                        >;
+                };
+
+
+                pinctrl_usdhc2: usdhc2grp {
+                        fsl,pins = <
+                                MX6UL_PAD_NAND_RE_B__USDHC2_CLK         0x10069
+                                MX6UL_PAD_NAND_WE_B__USDHC2_CMD         0x17059
+                                MX6UL_PAD_NAND_DATA00__USDHC2_DATA0     0x17059
+                                MX6UL_PAD_NAND_DATA01__USDHC2_DATA1     0x17059
+                                MX6UL_PAD_NAND_DATA02__USDHC2_DATA2     0x17059
+                                MX6UL_PAD_NAND_DATA03__USDHC2_DATA3     0x17059
+                                MX6UL_PAD_NAND_DATA04__USDHC2_DATA4     0x17059
+                                MX6UL_PAD_NAND_DATA05__USDHC2_DATA5     0x17059
+                                MX6UL_PAD_NAND_DATA06__USDHC2_DATA6     0x17059
+                                MX6UL_PAD_NAND_DATA07__USDHC2_DATA7     0x17059
+
+                        >;
+                };
+
+                pinctrl_usb_otg1: usb1grp {
+                        fsl,pins = <                                
+                                MX6UL_PAD_JTAG_TCK__GPIO1_IO14         0x1b0b0                 /* USB1 Power Enable switch      */
+                        >;
+                };
+
+                pinctrl_usb_otg2: usb2grp {
+                        fsl,pins = <                                
+                                MX6UL_PAD_CSI_HSYNC__GPIO4_IO20         0x1b0b0                 /* SIM5300E PowerKey            */
+                                MX6UL_PAD_GPIO1_IO09__GPIO1_IO09        0x1b0b0                 /* SIM5300E Reset               */
+                        >;
+                };
+};
+
+

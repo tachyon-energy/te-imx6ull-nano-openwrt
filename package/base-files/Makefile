@@ -139,6 +139,8 @@ endif
 
 
 define Package/base-files/install
+	date '+%Y%m%d%T' | tr -d : > $(TOPDIR)/package/base-files/files/etc/version-te
+	du -ks  $(TARGET_ROOTFS_DIR)/root-imx6ul/ |  cut -f1 >>  $(TOPDIR)/package/base-files/files/etc/version-te
 	$(CP) ./files/* $(1)/
 	$(Package/base-files/install-key)
 	$(Package/base-files/nand-support)

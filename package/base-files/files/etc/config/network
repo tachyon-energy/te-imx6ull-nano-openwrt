@@ -1,0 +1,31 @@
+config interface 'loopback'
+        option proto 'static'
+        option ipaddr '127.0.0.1'
+        option netmask '255.0.0.0'
+        option device 'lo'
+
+config globals 'globals'
+        option ula_prefix 'fd54:c2c0:ba9d::/48'
+
+config interface 'lan'
+        option proto 'dhcp'
+        option device 'eth0'
+
+config interface 'wan'
+        option proto 'dhcp'
+        option device 'eth1'
+        option peerdns '0'
+
+config interface 'wan6'
+        option proto 'dhcpv6'
+        option device 'eth1'
+
+config interface 'wwan'
+        option proto 'dhcp'
+
+config interface '3G'
+        option proto '3g'
+        option device '/dev/ttyUSB1'
+        option service 'umts'
+        option ipv6 'auto'
+
