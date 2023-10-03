@@ -21,6 +21,6 @@ include $(INCLUDE_DIR)/target.mk
 
 KERNELNAME:=zImage dtbs
 
-DEFAULT_PACKAGES += uboot-envtools mkf2fs e2fsprogs blkid openssl-util lsblk pv gzip wget curl libgpiod
+DEFAULT_PACKAGES += uboot-envtools mkf2fs e2fsprogs blkid openssl-util lsblk pv gzip wget curl libgpiod luci luci-theme-openwrt-2020 luci-app-ttyd avahi-utils avahi-dbus-daemon
 
 $(eval $(call BuildTarget))

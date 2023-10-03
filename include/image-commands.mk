@@ -511,25 +511,25 @@ define Build/supugrade
 	cp -fr $(TOPDIR)/package/base-files/files/etc/version-te $(KDIR_TMP)/$(DEVICE_NAME)/sup/version-te
 
 	pushd $(KDIR_TMP)/$(DEVICE_NAME)/sup/ &&  tar cvf $(BIN_DIR)/files.tar upd-$(DEVICE_IMG_PREFIX)-zImage upd-$(IMG_PREFIX)-$(DEVICE_DTS).dtb upd-$(DEVICE_IMG_PREFIX)-rootfs.tar.gz upd-u-boot.imx version-te && popd
-        openssl enc -aes-256-cbc -pass file:$(TOPDIR)/target/linux/imx6ul/key/key.txt < $(BIN_DIR)/files.tar > $(BIN_DIR)/openwrt-update-full-uboot.bin
+        openssl enc -aes-256-cbc -pass file:$(TOPDIR)/target/linux/imx6ul/key/key.bin < $(BIN_DIR)/files.tar > $(BIN_DIR)/openwrt-update-full-uboot.bin
 
 	pushd $(KDIR_TMP)/$(DEVICE_NAME)/sup/ &&  tar cvf $(BIN_DIR)/files.tar upd-$(DEVICE_IMG_PREFIX)-zImage upd-$(IMG_PREFIX)-$(DEVICE_DTS).dtb upd-$(DEVICE_IMG_PREFIX)-rootfs.tar.gz version-te && popd
-        openssl enc -aes-256-cbc -pass file:$(TOPDIR)/target/linux/imx6ul/key/key.txt < $(BIN_DIR)/files.tar > $(BIN_DIR)/openwrt-update-full.bin
+        openssl enc -aes-256-cbc -pass file:$(TOPDIR)/target/linux/imx6ul/key/key.bin < $(BIN_DIR)/files.tar > $(BIN_DIR)/openwrt-update-full.bin
 
 	pushd $(KDIR_TMP)/$(DEVICE_NAME)/sup/ &&  tar cvf $(BIN_DIR)/files.tar upd-$(DEVICE_IMG_PREFIX)-zImage version-te && popd
-        openssl enc -aes-256-cbc -pass file:$(TOPDIR)/target/linux/imx6ul/key/key.txt < $(BIN_DIR)/files.tar > $(BIN_DIR)/openwrt-update-kernel.bin
+        openssl enc -aes-256-cbc -pass file:$(TOPDIR)/target/linux/imx6ul/key/key.bin < $(BIN_DIR)/files.tar > $(BIN_DIR)/openwrt-update-kernel.bin
 
 	pushd $(KDIR_TMP)/$(DEVICE_NAME)/sup/ &&  tar cvf $(BIN_DIR)/files.tar upd-$(DEVICE_IMG_PREFIX)-zImage upd-$(IMG_PREFIX)-$(DEVICE_DTS).dtb version-te && popd
-        openssl enc -aes-256-cbc -pass file:$(TOPDIR)/target/linux/imx6ul/key/key.txt < $(BIN_DIR)/files.tar > $(BIN_DIR)/openwrt-update-kernel-dtb.bin
+        openssl enc -aes-256-cbc -pass file:$(TOPDIR)/target/linux/imx6ul/key/key.bin < $(BIN_DIR)/files.tar > $(BIN_DIR)/openwrt-update-kernel-dtb.bin
 
 	pushd $(KDIR_TMP)/$(DEVICE_NAME)/sup/ &&  tar cvf $(BIN_DIR)/files.tar upd-$(DEVICE_IMG_PREFIX)-rootfs.tar.gz version-te && popd
-        openssl enc -aes-256-cbc -pass file:$(TOPDIR)/target/linux/imx6ul/key/key.txt < $(BIN_DIR)/files.tar > $(BIN_DIR)/openwrt-update-rootfs.bin
+        openssl enc -aes-256-cbc -pass file:$(TOPDIR)/target/linux/imx6ul/key/key.bin < $(BIN_DIR)/files.tar > $(BIN_DIR)/openwrt-update-rootfs.bin
 
 	pushd $(KDIR_TMP)/$(DEVICE_NAME)/sup/ &&  tar cvf $(BIN_DIR)/files.tar upd-$(IMG_PREFIX)-$(DEVICE_DTS).dtb  version-te && popd
-        openssl enc -aes-256-cbc -pass file:$(TOPDIR)/target/linux/imx6ul/key/key.txt < $(BIN_DIR)/files.tar > $(BIN_DIR)/openwrt-update-dtb.bin
+        openssl enc -aes-256-cbc -pass file:$(TOPDIR)/target/linux/imx6ul/key/key.bin < $(BIN_DIR)/files.tar > $(BIN_DIR)/openwrt-update-dtb.bin
 
 	pushd $(KDIR_TMP)/$(DEVICE_NAME)/sup/ &&  tar cvf $(BIN_DIR)/files.tar upd-u-boot.imx  version-te && popd
-        openssl enc -aes-256-cbc -pass file:$(TOPDIR)/target/linux/imx6ul/key/key.txt < $(BIN_DIR)/files.tar > $(BIN_DIR)/openwrt-update-uboot.bin
+        openssl enc -aes-256-cbc -pass file:$(TOPDIR)/target/linux/imx6ul/key/key.bin < $(BIN_DIR)/files.tar > $(BIN_DIR)/openwrt-update-uboot.bin
 
         mv  $(BIN_DIR)/openwrt-update-full.bin $(BIN_DIR)/update/
 	mv  $(BIN_DIR)/openwrt-update-kernel.bin $(BIN_DIR)/update/
